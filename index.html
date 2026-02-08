@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Phishing Hunter - Telegram Game</title>
+    <title>Phishing Hunter Pro</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
@@ -15,11 +15,12 @@
     <div id="game-container"></div>
 
     <script>
+        // INICIALIZACIÓN DE TELEGRAM
         const tg = window.Telegram.WebApp;
-        tg.expand();
+        tg.expand(); // Expande la app a pantalla completa
         tg.ready();
 
-        // 1. BASE DE DATOS DE MENSAJES (Mejora: Contenido real educativo)
+        // BASE DE DATOS LOCAL: Aquí puedes agregar o quitar correos para el juego
         const phishingEmails = [
             { sender: "Admin_PayPaI", text: "¡Cuenta bloqueada! Clic aquí", isPhishing: true },
             { sender: "Netflix_Info", text: "Tu suscripción vence mañana", isPhishing: false },
@@ -31,137 +32,143 @@
             { sender: "Airdrop_Free", text: "Conecta tu wallet para reclamar", isPhishing: true }
         ];
 
+        // CONFIGURACIÓN DEL MOTOR PHASER
         const config = {
             type: Phaser.AUTO,
             width: window.innerWidth,
             height: window.innerHeight,
             parent: 'game-container',
             backgroundColor: '#16213e',
-            physics: { default: 'arcade', arcade: { debug: false } },
-            scene: { preload: preload, create: create, update: update }
+            scene: { preload: preload, create: create }
         };
 
         const game = new Phaser.Game(config);
-        let score = 0;
-        let scoreText;
-        let spawnRate = 1200; // Velocidad inicial
+        
+        // VARIABLES GLOBALES DE CONTROL
+        let score = 0;          // Puntaje actual
+        let lives = 3;          // Vidas restantes
+        let scoreText;          // Objeto visual del texto de puntos
+        let livesText;          // Objeto visual del texto de vidas
+        let isGameOver = false; // Estado del juego
 
+        // FUNCIÓN PRELOAD: Carga los recursos antes de iniciar
         function preload() {
-            // Icono de sobre
+            // Cargamos el icono del sobre desde una URL externa
             this.load.image('mail', 'https://cdn-icons-png.flaticon.com/512/561/561127.png');
         }
 
+        // FUNCIÓN CREATE: Configura los elementos iniciales en pantalla
         function create() {
-            // HUD: Puntuación
-            scoreText = this.add.text(20, 20, 'TOKENS: 0', {
-                fontSize: '28px',
-                fill: '#00d2ff',
-                fontFamily: 'Arial, sans-serif',
-                fontWeight: 'bold'
-            }).setDepth(10);
+            isGameOver = false;
+            score = 0;
+            lives = 3;
 
-            // Generador de correos
+            // Dibujamos el HUD (interfaz de usuario)
+            scoreText = this.add.text(20, 20, 'TOKENS: 0', { fontSize: '24px', fill: '#00d2ff', fontWeight: 'bold' });
+            livesText = this.add.text(window.innerWidth - 120, 20, '❤️ ' + lives, { fontSize: '24px', fill: '#ff4d4d' });
+
+            // Evento de tiempo: Ejecuta 'spawnEmail' cada 1.2 segundos infinitamente
             this.time.addEvent({
-                delay: spawnRate,
+                delay: 1200,
                 callback: spawnEmail,
                 callbackScope: this,
                 loop: true
             });
-
-            // Instrucción inferior
-            this.add.text(window.innerWidth/2, window.innerHeight - 30, '¡Toca solo los correos FALSOS!', {
-                fontSize: '14px',
-                fill: '#ffffff',
-                fontStyle: 'italic'
-            }).setOrigin(0.5);
         }
 
+        // FUNCIÓN SPAWNEMAIL: Crea y lanza los sobres desde la parte superior
         function spawnEmail() {
-            const x = Phaser.Math.Between(70, window.innerWidth - 70);
+            if (isGameOver) return; // Si el juego terminó, no salen más sobres
+
+            const x = Phaser.Math.Between(80, window.innerWidth - 80); // Posición X aleatoria
+            const data = phishingEmails[Math.floor(Math.random() * phishingEmails.length)]; // Elige mensaje al azar
             
-            // Elegimos un mensaje al azar de nuestra base de datos
-            const data = phishingEmails[Math.floor(Math.random() * phishingEmails.length)];
-            
+            // Creamos un contenedor para agrupar el rectángulo y los textos
             const emailContainer = this.add.container(x, -100);
             
-            // Fondo del sobre (Mejora: Tamaño más grande para leer mejor)
+            // Dibujamos el fondo del sobre (Rojo si es trampa, Verde si es real)
             const rect = this.add.rectangle(0, 0, 160, 90, data.isPhishing ? 0xff4d4d : 0x4dff88);
-            rect.setStrokeStyle(3, 0xffffff);
+            rect.setStrokeStyle(3, 0xffffff); // Borde blanco
             
-            // Icono pequeño de mail
-            const sprite = this.add.sprite(0, -25, 'mail').setScale(0.06).setAlpha(0.7);
-            
-            // Texto del remitente (Sender)
-            const senderLabel = this.add.text(0, -5, data.sender, {
-                fontSize: '12px',
-                fill: '#000',
-                fontWeight: 'bold'
-            }).setOrigin(0.5);
-
-            // Texto del cuerpo (Mensaje)
-            const messageLabel = this.add.text(0, 20, data.text, {
-                fontSize: '10px',
-                fill: '#333',
-                wordWrap: { width: 140 },
-                align: 'center'
-            }).setOrigin(0.5);
+            // Agregamos icono, nombre del remitente y mensaje
+            const sprite = this.add.sprite(0, -25, 'mail').setScale(0.06);
+            const senderLabel = this.add.text(0, -5, data.sender, { fontSize: '12px', fill: '#000', fontWeight: 'bold' }).setOrigin(0.5);
+            const messageLabel = this.add.text(0, 20, data.text, { fontSize: '10px', fill: '#333', wordWrap: { width: 140 }, align: 'center' }).setOrigin(0.5);
 
             emailContainer.add([rect, sprite, senderLabel, messageLabel]);
             emailContainer.setSize(160, 90);
             emailContainer.setInteractive(new Phaser.Geom.Rectangle(-80, -45, 160, 90), Phaser.Geom.Rectangle.Contains);
 
-            // Movimiento (Dificultad: un poco más rápido según la puntuación)
-            const speed = Phaser.Math.Between(3000, 5000) - (score * 2);
+            // CÁLCULO DE DIFICULTAD: Aumenta la velocidad según el puntaje
+            const levelBonus = Math.floor(score / 100) * 350; 
+            const duration = Math.max(1100, 4500 - levelBonus); // No baja de 1.1 segundos
+
+            // Movimiento hacia abajo con un "tween" (animación)
             this.tweens.add({
                 targets: emailContainer,
                 y: window.innerHeight + 150,
-                duration: Math.max(speed, 1500),
-                onComplete: () => emailContainer.destroy()
+                duration: duration,
+                onComplete: () => { emailContainer.destroy(); } // Se borra al salir de pantalla
             });
 
-            // Lógica de interacción
+            // LÓGICA AL TOCAR EL SOBRE
             emailContainer.on('pointerdown', () => {
+                if (isGameOver) return;
+
                 if (data.isPhishing) {
-                    // ¡Correcto! Es Phishing
+                    // Si acierta (toca Phishing): Suma puntos y vibra suave
                     score += 10;
-                    scoreText.setText('TOKENS: ' + score);
                     tg.HapticFeedback.impactOccurred('medium');
-                    
-                    // Animación de desaparición "Pop"
-                    this.tweens.add({
-                        targets: emailContainer,
-                        scale: 1.3,
-                        alpha: 0,
-                        duration: 150,
-                        onComplete: () => emailContainer.destroy()
-                    });
                 } else {
-                    // ¡Error! Era un correo real
+                    // Si falla (toca correo real): Resta vida, vibra error y sacude cámara
+                    lives--;
                     tg.HapticFeedback.notificationOccurred('error');
-                    this.cameras.main.shake(250, 0.015); // Sacudida más fuerte
-                    score = Math.max(0, score - 20); // Penalización mayor
-                    scoreText.setText('TOKENS: ' + score);
-                    
-                    // Animación roja de error
-                    rect.setFillStyle(0xff0000);
-                    this.tweens.add({
-                        targets: emailContainer,
-                        x: emailContainer.x + 10,
-                        yoyo: true,
-                        repeat: 3,
-                        duration: 50,
-                        onComplete: () => emailContainer.destroy()
-                    });
+                    this.cameras.main.shake(200, 0.01);
+                    if (lives <= 0) gameOver.call(this); // Fin del juego
                 }
+                
+                // Actualizamos textos en pantalla
+                scoreText.setText('TOKENS: ' + score);
+                livesText.setText('❤️ ' + lives);
+                emailContainer.destroy(); // Elimina el sobre tocado
             });
         }
 
-        function update() {}
+        // FUNCIÓN GAMEOVER: Detiene el juego y muestra el menú final
+        function gameOver() {
+            isGameOver = true;
+            // Fondo oscuro semitransparente
+            this.add.rectangle(window.innerWidth/2, window.innerHeight/2, window.innerWidth, window.innerHeight, 0x000000, 0.85);
+            
+            // Mensajes finales
+            this.add.text(window.innerWidth/2, window.innerHeight/2 - 100, 'FIN DEL JUEGO', { fontSize: '38px', fill: '#ff4d4d', fontWeight: 'bold' }).setOrigin(0.5);
+            this.add.text(window.innerWidth/2, window.innerHeight/2 - 30, 'Puntaje: ' + score, { fontSize: '28px', fill: '#ffffff' }).setOrigin(0.5);
+            
+            // Botón para enviar datos a Telegram
+            const saveBtn = this.add.text(window.innerWidth/2, window.innerHeight/2 + 50, '💰 RECLAMAR TOKENS', { 
+                fontSize: '22px', fill: '#ffffff', backgroundColor: '#28a745', padding: 15
+            }).setOrigin(0.5).setInteractive();
 
-        window.addEventListener('resize', () => {
-            game.scale.resize(window.innerWidth, window.innerHeight);
-        });
+            saveBtn.on('pointerdown', () => { sendScoreToBot(score); });
+
+            // Botón para reiniciar la escena
+            const restartBtn = this.add.text(window.innerWidth/2, window.innerHeight/2 + 130, '🔄 JUGAR DE NUEVO', { 
+                fontSize: '18px', fill: '#aaaaaa', padding: 10 
+            }).setOrigin(0.5).setInteractive();
+
+            restartBtn.on('pointerdown', () => { this.scene.restart(); });
+        }
+
+        // FUNCIÓN SENDSCORETOBOT: Envía el puntaje final al chat de Telegram
+        function sendScoreToBot(finalScore) {
+            tg.showConfirm(`¿Guardar ${finalScore} tokens en tu cuenta?`, (confirm) => {
+                if (confirm) {
+                    // El comando SCORE:XX es lo que leerá tu bot
+                    tg.sendData(`SCORE:${finalScore}`);
+                    tg.close(); // Cierra el juego después de enviar
+                }
+            });
+        }
     </script>
 </body>
 </html>
-
