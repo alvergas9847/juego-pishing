@@ -3,19 +3,131 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Phishing Scanner</title>
+    <title>Phishing Hunter - Telegram Game</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/phaser@3.60.0/dist/phaser.min.js"></script>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; }
-        canvas { display: block; }
+        body { margin: 0; padding: 0; overflow: hidden; background-color: #1a1a2e; }
+        canvas { display: block; margin: 0 auto; }
     </style>
 </head>
 <body>
+    <div id="game-container"></div>
+
     <script>
-        // Aquí es donde la IA pegará la lógica del juego que diseñemos
         const tg = window.Telegram.WebApp;
-        tg.expand(); // Abre el juego a pantalla completa
+        tg.expand();
+        tg.ready();
+
+        const config = {
+            type: Phaser.AUTO,
+            width: window.innerWidth,
+            height: window.innerHeight,
+            parent: 'game-container',
+            backgroundColor: '#16213e',
+            physics: { default: 'arcade', arcade: { debug: false } },
+            scene: { preload: preload, create: create, update: update }
+        };
+
+        const game = new Phaser.Game(config);
+        let score = 0;
+        let scoreText;
+
+        function preload() {
+            // Intentamos cargar un icono de sobre, si falla usaremos gráficos generados
+            this.load.image('mail', 'https://cdn-icons-png.flaticon.com/512/561/561127.png');
+        }
+
+        function create() {
+            // Texto de puntuación con estilo
+            scoreText = this.add.text(20, 20, 'TOKENS: 0', {
+                fontSize: '28px',
+                fill: '#00d2ff',
+                fontFamily: 'Arial, sans-serif',
+                fontWeight: 'bold'
+            }).setDepth(10);
+
+            // Generador de correos cada 1.2 segundos
+            this.time.addEvent({
+                delay: 1200,
+                callback: spawnEmail,
+                callbackScope: this,
+                loop: true
+            });
+
+            // Mensaje de inicio
+            this.add.text(window.innerWidth/2, window.innerHeight - 50, '¡Atrapa solo el PHISHING!', {
+                fontSize: '16px',
+                fill: '#ffffff'
+            }).setOrigin(0.5);
+        }
+
+        function spawnEmail() {
+            const x = Phaser.Math.Between(50, window.innerWidth - 50);
+            const isPhishing = Math.random() < 0.6; // 60% probabilidad de ser phishing
+            
+            // Creamos un contenedor para el sobre y el texto
+            const emailContainer = this.add.container(x, -50);
+            
+            // Dibujamos un rectángulo por si la imagen no carga
+            const rect = this.add.rectangle(0, 0, 80, 50, isPhishing ? 0xff4d4d : 0x4dff88);
+            rect.setStrokeStyle(2, 0xffffff);
+            
+            // Intentamos añadir la imagen encima
+            const sprite = this.add.sprite(0, 0, 'mail').setScale(0.1);
+            
+            const label = this.add.text(0, 0, isPhishing ? 'FAKE' : 'REAL', {
+                fontSize: '12px',
+                fill: '#000',
+                fontWeight: 'bold'
+            }).setOrigin(0.5);
+
+            emailContainer.add([rect, sprite, label]);
+            emailContainer.setSize(80, 50);
+            emailContainer.setInteractive(new Phaser.Geom.Rectangle(-40, -25, 80, 50), Phaser.Geom.Rectangle.Contains);
+
+            // Movimiento
+            this.tweens.add({
+                targets: emailContainer,
+                y: window.innerHeight + 100,
+                duration: Phaser.Math.Between(3000, 5000),
+                onComplete: () => emailContainer.destroy()
+            });
+
+            // Lógica de clic
+            emailContainer.on('pointerdown', () => {
+                if (isPhishing) {
+                    score += 10;
+                    scoreText.setText('TOKENS: ' + score);
+                    tg.HapticFeedback.impactOccurred('light');
+                    
+                    // Efecto visual de acierto
+                    this.tweens.add({
+                        targets: emailContainer,
+                        scale: 1.5,
+                        alpha: 0,
+                        duration: 200,
+                        onComplete: () => emailContainer.destroy()
+                    });
+                } else {
+                    // ERROR: Correo real
+                    tg.HapticFeedback.notificationOccurred('error');
+                    this.cameras.main.shake(200, 0.01);
+                    score = Math.max(0, score - 5);
+                    scoreText.setText('TOKENS: ' + score);
+                    emailContainer.destroy();
+                }
+            });
+        }
+
+        function update() {
+            // Aquí se pueden añadir animaciones de fondo
+        }
+
+        // Ajustar al tamaño de pantalla si se rota el móvil
+        window.addEventListener('resize', () => {
+            game.scale.resize(window.innerWidth, window.innerHeight);
+        });
     </script>
 </body>
 </html>
